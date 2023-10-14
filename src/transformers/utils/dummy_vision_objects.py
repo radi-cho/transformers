@@ -387,6 +387,13 @@ class PerceiverImageProcessor(metaclass=DummyObject):
         requires_backends(self, ["vision"])
 
 
+class Pix2StructImageProcessor(metaclass=DummyObject):
+    _backends = ["vision"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["vision"])
+
+
 class PoolFormerFeatureExtractor(metaclass=DummyObject):
     _backends = ["vision"]
 
@@ -395,6 +402,20 @@ class PoolFormerFeatureExtractor(metaclass=DummyObject):
 
 
 class PoolFormerImageProcessor(metaclass=DummyObject):
+    _backends = ["vision"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["vision"])
+
+
+class PvtImageProcessor(metaclass=DummyObject):
+    _backends = ["vision"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["vision"])
+
+
+class SamImageProcessor(metaclass=DummyObject):
     _backends = ["vision"]
 
     def __init__(self, *args, **kwargs):
@@ -479,6 +500,13 @@ class ViTImageProcessor(metaclass=DummyObject):
 
 
 class ViTHybridImageProcessor(metaclass=DummyObject):
+    _backends = ["vision"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["vision"])
+
+
+class VivitImageProcessor(metaclass=DummyObject):
     _backends = ["vision"]
 
     def __init__(self, *args, **kwargs):

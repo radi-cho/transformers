@@ -13,10 +13,10 @@ if is_vision_available():
 
 if is_torch_available():
     from ..models.auto.modeling_auto import (
-        MODEL_FOR_IMAGE_SEGMENTATION_MAPPING,
-        MODEL_FOR_INSTANCE_SEGMENTATION_MAPPING,
-        MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING,
-        MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING,
+        MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES,
+        MODEL_FOR_INSTANCE_SEGMENTATION_MAPPING_NAMES,
+        MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES,
+        MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES,
     )
 
 
@@ -71,21 +71,18 @@ class ImageSegmentationPipeline(Pipeline):
             raise ValueError(f"The {self.__class__} is only available in PyTorch.")
 
         requires_backends(self, "vision")
-        self.check_model_type(
-            dict(
-                MODEL_FOR_IMAGE_SEGMENTATION_MAPPING.items()
-                + MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING.items()
-                + MODEL_FOR_INSTANCE_SEGMENTATION_MAPPING.items()
-                + MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING.items()
-            )
-        )
+        mapping = MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES.copy()
+        mapping.update(MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES)
+        mapping.update(MODEL_FOR_INSTANCE_SEGMENTATION_MAPPING_NAMES)
+        mapping.update(MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES)
+        self.check_model_type(mapping)
 
     def _sanitize_parameters(self, **kwargs):
-        preprocessor_kwargs = {}
+        preprocess_kwargs = {}
         postprocess_kwargs = {}
         if "subtask" in kwargs:
             postprocess_kwargs["subtask"] = kwargs["subtask"]
-            preprocessor_kwargs["subtask"] = kwargs["subtask"]
+            preprocess_kwargs["subtask"] = kwargs["subtask"]
         if "threshold" in kwargs:
             postprocess_kwargs["threshold"] = kwargs["threshold"]
         if "mask_threshold" in kwargs:
@@ -93,7 +90,7 @@ class ImageSegmentationPipeline(Pipeline):
         if "overlap_mask_area_threshold" in kwargs:
             postprocess_kwargs["overlap_mask_area_threshold"] = kwargs["overlap_mask_area_threshold"]
 
-        return preprocessor_kwargs, {}, postprocess_kwargs
+        return preprocess_kwargs, {}, postprocess_kwargs
 
     def __call__(self, images, **kwargs) -> Union[Predictions, List[Prediction]]:
         """

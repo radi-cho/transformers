@@ -37,7 +37,7 @@ if is_vision_available():
 if is_torch_available():
     import torch
 
-    from ..models.auto.modeling_auto import MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING
+    from ..models.auto.modeling_auto import MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES
 
 TESSERACT_LOADED = False
 if is_pytesseract_available():
@@ -131,13 +131,18 @@ class DocumentQuestionAnsweringPipeline(ChunkPipeline):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.tokenizer is not None and not self.tokenizer.__class__.__name__.endswith("Fast"):
+            raise ValueError(
+                "`DocumentQuestionAnsweringPipeline` requires a fast tokenizer, but a slow tokenizer "
+                f"(`{self.tokenizer.__class__.__name__}`) is provided."
+            )
 
         if self.model.config.__class__.__name__ == "VisionEncoderDecoderConfig":
             self.model_type = ModelType.VisionEncoderDecoder
             if self.model.config.encoder.model_type != "donut-swin":
                 raise ValueError("Currently, the only supported VisionEncoderDecoder model is Donut")
         else:
-            self.check_model_type(MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING)
+            self.check_model_type(MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES)
             if self.model.config.__class__.__name__ == "LayoutLMConfig":
                 self.model_type = ModelType.LayoutLM
             else:
@@ -418,7 +423,7 @@ class DocumentQuestionAnsweringPipeline(ChunkPipeline):
         else:
             model_outputs = self.model(**model_inputs)
 
-        model_outputs = {k: v for (k, v) in model_outputs.items()}
+        model_outputs = dict(model_outputs.items())
         model_outputs["p_mask"] = p_mask
         model_outputs["word_ids"] = word_ids
         model_outputs["words"] = words

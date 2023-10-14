@@ -279,6 +279,7 @@ TASK_TAG_TO_NAME_MAPPING = {
     "translation": "Translation",
     "zero-shot-classification": "Zero Shot Classification",
     "automatic-speech-recognition": "Automatic Speech Recognition",
+    "audio-classification": "Audio Classification",
 }
 
 
@@ -399,9 +400,9 @@ class TrainingSummary:
         dataset_metadata = _listify(self.dataset_metadata)
         if len(dataset_args) < len(dataset_tags):
             dataset_args = dataset_args + [None] * (len(dataset_tags) - len(dataset_args))
-        dataset_mapping = {tag: name for tag, name in zip(dataset_tags, dataset_names)}
-        dataset_arg_mapping = {tag: arg for tag, arg in zip(dataset_tags, dataset_args)}
-        dataset_metadata_mapping = {tag: metadata for tag, metadata in zip(dataset_tags, dataset_metadata)}
+        dataset_mapping = dict(zip(dataset_tags, dataset_names))
+        dataset_arg_mapping = dict(zip(dataset_tags, dataset_args))
+        dataset_metadata_mapping = dict(zip(dataset_tags, dataset_metadata))
 
         task_mapping = {
             task: TASK_TAG_TO_NAME_MAPPING[task] for task in _listify(self.tasks) if task in TASK_TAG_TO_NAME_MAPPING
@@ -458,6 +459,8 @@ class TrainingSummary:
         metadata = {}
         metadata = _insert_values_as_list(metadata, "language", self.language)
         metadata = _insert_value(metadata, "license", self.license)
+        if self.finetuned_from is not None:
+            metadata = _insert_value(metadata, "base_model", self.finetuned_from)
         metadata = _insert_values_as_list(metadata, "tags", self.tags)
         metadata = _insert_values_as_list(metadata, "datasets", self.dataset_tags)
         metadata = _insert_values_as_list(metadata, "metrics", list(metric_mapping.keys()))

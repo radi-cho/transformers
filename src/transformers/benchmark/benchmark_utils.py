@@ -610,7 +610,7 @@ class Benchmark(ABC):
                 model_name: AutoConfig.from_pretrained(model_name) for model_name in self.args.model_names
             }
         else:
-            self.config_dict = {model_name: config for model_name, config in zip(self.args.model_names, configs)}
+            self.config_dict = dict(zip(self.args.model_names, configs))
 
         warnings.warn(
             f"The class {self.__class__} is deprecated. Hugging Face Benchmarking utils"
@@ -890,7 +890,8 @@ class Benchmark(ABC):
             return
         self.print_fn("Saving results to csv.")
         with open(filename, mode="w") as csv_file:
-            assert len(self.args.model_names) > 0, f"At least 1 model should be defined, but got {self.model_names}"
+            if len(self.args.model_names) <= 0:
+                raise ValueError(f"At least 1 model should be defined, but got {self.model_names}")
 
             fieldnames = ["model", "batch_size", "sequence_length"]
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames + ["result"])

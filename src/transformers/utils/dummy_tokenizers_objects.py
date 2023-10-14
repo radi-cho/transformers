@@ -107,6 +107,13 @@ class DebertaV2TokenizerFast(metaclass=DummyObject):
         requires_backends(self, ["tokenizers"])
 
 
+class RetriBertTokenizerFast(metaclass=DummyObject):
+    _backends = ["tokenizers"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["tokenizers"])
+
+
 class DistilBertTokenizerFast(metaclass=DummyObject):
     _backends = ["tokenizers"]
 
@@ -219,6 +226,13 @@ class LEDTokenizerFast(metaclass=DummyObject):
         requires_backends(self, ["tokenizers"])
 
 
+class LlamaTokenizerFast(metaclass=DummyObject):
+    _backends = ["tokenizers"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["tokenizers"])
+
+
 class LongformerTokenizerFast(metaclass=DummyObject):
     _backends = ["tokenizers"]
 
@@ -318,13 +332,6 @@ class ReformerTokenizerFast(metaclass=DummyObject):
 
 
 class RemBertTokenizerFast(metaclass=DummyObject):
-    _backends = ["tokenizers"]
-
-    def __init__(self, *args, **kwargs):
-        requires_backends(self, ["tokenizers"])
-
-
-class RetriBertTokenizerFast(metaclass=DummyObject):
     _backends = ["tokenizers"]
 
     def __init__(self, *args, **kwargs):

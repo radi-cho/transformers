@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Dict, Optional, Union
 import numpy as np
 import requests
 
-from ..utils import is_torch_available, logging
+from ..utils import is_torch_available, is_torchaudio_available, logging
 from .audio_utils import ffmpeg_read
 from .base import ChunkPipeline
 
@@ -25,12 +25,12 @@ from .base import ChunkPipeline
 if TYPE_CHECKING:
     from pyctcdecode import BeamSearchDecoderCTC
 
-    from ...feature_extraction_sequence_utils import SequenceFeatureExtractor
+    from ..feature_extraction_sequence_utils import SequenceFeatureExtractor
 
 logger = logging.get_logger(__name__)
 
 if is_torch_available():
-    from ..models.auto.modeling_auto import MODEL_FOR_CTC_MAPPING, MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING
+    from ..models.auto.modeling_auto import MODEL_FOR_CTC_MAPPING_NAMES, MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES
 
 
 def rescale_stride(stride, ratio):
@@ -205,7 +205,7 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
 
         if self.model.config.model_type == "whisper":
             self.type = "seq2seq_whisper"
-        elif self.model.__class__ in MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING.values():
+        elif self.model.__class__.__name__ in MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES.values():
             self.type = "seq2seq"
         elif (
             feature_extractor._processor_class
@@ -220,7 +220,9 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
         if self.framework == "tf":
             raise ValueError("The AutomaticSpeechRecognitionPipeline is only available in PyTorch.")
 
-        self.check_model_type(dict(MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING.items() + MODEL_FOR_CTC_MAPPING.items()))
+        mapping = MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES.copy()
+        mapping.update(MODEL_FOR_CTC_MAPPING_NAMES)
+        self.check_model_type(mapping)
 
     def __call__(
         self,
@@ -246,12 +248,12 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
                       treat the first `left` samples and last `right` samples to be ignored in decoding (but used at
                       inference to provide more context to the model). Only use `stride` with CTC models.
             return_timestamps (*optional*, `str`):
-                Only available for pure CTC models. If set to `"char"`, the pipeline will return `timestamps` along the
-                text for every character in the text. For instance if you get `[{"text": "h", "timestamps": (0.5,0.6),
-                {"text": "i", "timestamps": (0.7, .9)}]`, then it means the model predicts that the letter "h" was
+                Only available for pure CTC models. If set to `"char"`, the pipeline will return timestamps along the
+                text for every character in the text. For instance if you get `[{"text": "h", "timestamp": (0.5, 0.6)},
+                {"text": "i", "timestamp": (0.7, 0.9)}]`, then it means the model predicts that the letter "h" was
                 pronounced after `0.5` and before `0.6` seconds. If set to `"word"`, the pipeline will return
-                `timestamps` along the text for every word in the text. For instance if you get `[{"text": "hi ",
-                "timestamps": (0.5,0.9), {"text": "there", "timestamps": (1.0, .1.5)}]`, then it means the model
+                timestamps along the text for every word in the text. For instance if you get `[{"text": "hi ",
+                "timestamp": (0.5, 0.9)}, {"text": "there", "timestamp": (1.0, 1.5)}]`, then it means the model
                 predicts that the word "hi" was pronounced after `0.5` and before `0.9` seconds.
             generate_kwargs (`dict`, *optional*):
                 The dictionary of ad-hoc parametrization of `generate_config` to be used for the generation call. For a
@@ -265,8 +267,8 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
                 - **text** (`str` ) -- The recognized text.
                 - **chunks** (*optional(, `List[Dict]`)
                         When using `return_timestamps`, the `chunks` will become a list containing all the various text
-                        chunks identified by the model, *e.g.* `[{"text": "hi ", "timestamps": (0.5,0.9), {"text":
-                        "there", "timestamps": (1.0, 1.5)}]`. The original full text can roughly be recovered by doing
+                        chunks identified by the model, *e.g.* `[{"text": "hi ", "timestamp": (0.5, 0.9)}, {"text":
+                        "there", "timestamp": (1.0, 1.5)}]`. The original full text can roughly be recovered by doing
                         `"".join(chunk["text"] for chunk in output["chunks"])`.
         """
         return super().__call__(inputs, **kwargs)
@@ -349,7 +351,14 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
             inputs = _inputs
             if in_sampling_rate != self.feature_extractor.sampling_rate:
                 import torch
-                from torchaudio import functional as F
+
+                if is_torchaudio_available():
+                    from torchaudio import functional as F
+                else:
+                    raise ImportError(
+                        "torchaudio is required to resample audio samples in AutomaticSpeechRecognitionPipeline. "
+                        "The torchaudio package can be installed through: `pip install torchaudio`."
+                    )
 
                 inputs = F.resample(
                     torch.from_numpy(inputs), in_sampling_rate, self.feature_extractor.sampling_rate
@@ -421,6 +430,8 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
             generate_kwargs = {}
         if return_timestamps and self.type == "seq2seq_whisper":
             generate_kwargs["return_timestamps"] = return_timestamps
+            if return_timestamps == "word":
+                generate_kwargs["return_token_timestamps"] = True
         is_last = model_inputs.pop("is_last")
 
         if self.type in {"seq2seq", "seq2seq_whisper"}:
@@ -447,7 +458,10 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
                 attention_mask=attention_mask,
                 **generate_kwargs,
             )
-            out = {"tokens": tokens}
+            if return_timestamps == "word" and self.type == "seq2seq_whisper":
+                out = {"tokens": tokens["sequences"], "token_timestamps": tokens["token_timestamps"]}
+            else:
+                out = {"tokens": tokens}
             if self.type == "seq2seq_whisper":
                 stride = model_inputs.pop("stride", None)
                 if stride is not None:
@@ -486,9 +500,9 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
         if return_timestamps and self.type == "seq2seq":
             raise ValueError("We cannot return_timestamps yet on non-ctc models apart from Whisper !")
         if return_timestamps == "char" and self.type == "ctc_with_lm":
-            raise ValueError("CTC with LM cannot return `char` timestamps, only `words`")
-        if return_timestamps in {"char", "words"} and self.type == "seq2seq_whisper":
-            raise ValueError("Whisper cannot return `char` nor `words` timestamps, use `True` instead.")
+            raise ValueError("CTC with LM cannot return `char` timestamps, only `word`")
+        if return_timestamps == "char" and self.type == "seq2seq_whisper":
+            raise ValueError("Whisper cannot return `char` timestamps, use `True` or `word` instead.")
 
         if return_language is not None and self.type != "seq2seq_whisper":
             raise ValueError("Only whisper can return language for now.")
@@ -574,6 +588,7 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
             output.pop("logits", None)
             output.pop("is_last", None)
             output.pop("stride", None)
+            output.pop("token_timestamps", None)
             for k, v in output.items():
                 extra[k].append(v)
         return {"text": text, **optional, **extra}

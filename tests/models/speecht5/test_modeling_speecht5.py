@@ -25,10 +25,10 @@ from transformers.testing_utils import (
     require_sentencepiece,
     require_tokenizers,
     require_torch,
-    require_torchaudio,
     slow,
     torch_device,
 )
+from transformers.trainer_utils import set_seed
 from transformers.utils import cached_property
 
 from ...test_configuration_common import ConfigTester
@@ -583,7 +583,7 @@ class SpeechT5ForSpeechToTextTest(ModelTesterMixin, unittest.TestCase):
                     "feature_projection.projection.bias",
                 ]
                 if param.requires_grad:
-                    if any([x in name for x in uniform_init_parms]):
+                    if any(x in name for x in uniform_init_parms):
                         self.assertTrue(
                             -1.0 <= ((param.data.mean() * 1e9).round() / 1e9).item() <= 1.0,
                             msg=f"Parameter {name} of model {model_class} seems not properly initialized",
@@ -716,7 +716,6 @@ class SpeechT5ForSpeechToTextTest(ModelTesterMixin, unittest.TestCase):
 
 
 @require_torch
-@require_torchaudio
 @require_sentencepiece
 @require_tokenizers
 @slow
@@ -793,6 +792,9 @@ class SpeechT5ForTextToSpeechTester:
         vocab_size=81,
         num_mel_bins=20,
         reduction_factor=2,
+        speech_decoder_postnet_layers=2,
+        speech_decoder_postnet_units=32,
+        speech_decoder_prenet_units=32,
     ):
         self.parent = parent
         self.batch_size = batch_size
@@ -806,6 +808,9 @@ class SpeechT5ForTextToSpeechTester:
         self.vocab_size = vocab_size
         self.num_mel_bins = num_mel_bins
         self.reduction_factor = reduction_factor
+        self.speech_decoder_postnet_layers = speech_decoder_postnet_layers
+        self.speech_decoder_postnet_units = speech_decoder_postnet_units
+        self.speech_decoder_prenet_units = speech_decoder_prenet_units
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.encoder_seq_length], self.vocab_size).clamp(2)
@@ -840,6 +845,9 @@ class SpeechT5ForTextToSpeechTester:
             vocab_size=self.vocab_size,
             num_mel_bins=self.num_mel_bins,
             reduction_factor=self.reduction_factor,
+            speech_decoder_postnet_layers=self.speech_decoder_postnet_layers,
+            speech_decoder_postnet_units=self.speech_decoder_postnet_units,
+            speech_decoder_prenet_units=self.speech_decoder_prenet_units,
         )
 
     def create_and_check_model_forward(self, config, inputs_dict):
@@ -928,7 +936,7 @@ class SpeechT5ForTextToSpeechTest(ModelTesterMixin, unittest.TestCase):
                     "conv.weight",
                 ]
                 if param.requires_grad:
-                    if any([x in name for x in uniform_init_parms]):
+                    if any(x in name for x in uniform_init_parms):
                         self.assertTrue(
                             -1.0 <= ((param.data.mean() * 1e9).round() / 1e9).item() <= 1.0,
                             msg=f"Parameter {name} of model {model_class} seems not properly initialized",
@@ -991,7 +999,6 @@ class SpeechT5ForTextToSpeechTest(ModelTesterMixin, unittest.TestCase):
 
 
 @require_torch
-@require_torchaudio
 @require_sentencepiece
 @require_tokenizers
 @slow
@@ -1005,11 +1012,13 @@ class SpeechT5ForTextToSpeechIntegrationTests(unittest.TestCase):
         model.to(torch_device)
         processor = self.default_processor
 
+        set_seed(555)  # make deterministic
+
         input_text = "mister quilter is the apostle of the middle classes and we are glad to welcome his gospel"
         input_ids = processor(text=input_text, return_tensors="pt").input_ids.to(torch_device)
 
         generated_speech = model.generate_speech(input_ids)
-        self.assertEqual(generated_speech.shape, (1800, model.config.num_mel_bins))
+        self.assertEqual(generated_speech.shape, (1820, model.config.num_mel_bins))
 
 
 @require_torch
@@ -1034,6 +1043,9 @@ class SpeechT5ForSpeechToSpeechTester:
         vocab_size=81,
         num_mel_bins=20,
         reduction_factor=2,
+        speech_decoder_postnet_layers=2,
+        speech_decoder_postnet_units=32,
+        speech_decoder_prenet_units=32,
     ):
         self.parent = parent
         self.batch_size = batch_size
@@ -1053,6 +1065,9 @@ class SpeechT5ForSpeechToSpeechTester:
         self.vocab_size = vocab_size
         self.num_mel_bins = num_mel_bins
         self.reduction_factor = reduction_factor
+        self.speech_decoder_postnet_layers = speech_decoder_postnet_layers
+        self.speech_decoder_postnet_units = speech_decoder_postnet_units
+        self.speech_decoder_prenet_units = speech_decoder_prenet_units
 
     def prepare_config_and_inputs(self):
         input_values = floats_tensor([self.batch_size, self.encoder_seq_length], scale=1.0)
@@ -1093,6 +1108,9 @@ class SpeechT5ForSpeechToSpeechTester:
             vocab_size=self.vocab_size,
             num_mel_bins=self.num_mel_bins,
             reduction_factor=self.reduction_factor,
+            speech_decoder_postnet_layers=self.speech_decoder_postnet_layers,
+            speech_decoder_postnet_units=self.speech_decoder_postnet_units,
+            speech_decoder_prenet_units=self.speech_decoder_prenet_units,
         )
 
     def create_and_check_model_forward(self, config, inputs_dict):
@@ -1337,7 +1355,7 @@ class SpeechT5ForSpeechToSpeechTest(ModelTesterMixin, unittest.TestCase):
                     "feature_projection.projection.bias",
                 ]
                 if param.requires_grad:
-                    if any([x in name for x in uniform_init_parms]):
+                    if any(x in name for x in uniform_init_parms):
                         self.assertTrue(
                             -1.0 <= ((param.data.mean() * 1e9).round() / 1e9).item() <= 1.0,
                             msg=f"Parameter {name} of model {model_class} seems not properly initialized",
@@ -1406,7 +1424,6 @@ class SpeechT5ForSpeechToSpeechTest(ModelTesterMixin, unittest.TestCase):
 
 
 @require_torch
-@require_torchaudio
 @require_sentencepiece
 @require_tokenizers
 @slow
@@ -1463,6 +1480,7 @@ class SpeechT5HifiGanTester:
     def get_config(self):
         return SpeechT5HifiGanConfig(
             model_in_dim=self.num_mel_bins,
+            upsample_initial_channel=32,
         )
 
     def create_and_check_model(self, config, input_values):
